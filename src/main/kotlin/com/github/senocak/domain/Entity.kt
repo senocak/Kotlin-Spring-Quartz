@@ -60,7 +60,7 @@ class Role(@Column @Enumerated(EnumType.STRING) var name: RoleName? = null) : Ba
 
 @Entity
 @Table(name = "scheduler", uniqueConstraints = [
-    UniqueConstraint(columnNames = ["name"])
+    UniqueConstraint(columnNames = ["name", "group"])
 ])
 class Scheduler(
     @Enumerated(EnumType.STRING) @Column var status: Status = Status.UNKNOWN,

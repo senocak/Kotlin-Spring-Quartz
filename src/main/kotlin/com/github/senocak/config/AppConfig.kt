@@ -112,4 +112,8 @@ class AppConfig(private val authorizationInterceptor: AuthorizationInterceptor):
      */
     @Bean
     fun passwordEncoder(): PasswordEncoder = BCryptPasswordEncoder()
+
+    //@Bean
+    //@Scope("prototype")
+    //fun logger(injectionPoint: InjectionPoint): Logger = LoggerFactory.getLogger(injectionPoint.methodParameter?.containingClass)
 }

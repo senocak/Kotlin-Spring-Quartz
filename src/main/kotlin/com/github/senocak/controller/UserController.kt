@@ -3,7 +3,6 @@ package com.github.senocak.controller
 import com.github.senocak.domain.Scheduler
 import com.github.senocak.domain.User
 import com.github.senocak.domain.dto.ExceptionDto
-import com.github.senocak.domain.dto.JobResponse
 import com.github.senocak.domain.dto.PaginationCriteria
 import com.github.senocak.domain.dto.SchedulerRequest
 import com.github.senocak.domain.dto.SchedulerResponse
@@ -11,7 +10,6 @@ import com.github.senocak.domain.dto.UpdateUserDto
 import com.github.senocak.domain.dto.UserPaginationDTO
 import com.github.senocak.domain.dto.UserResponse
 import com.github.senocak.exception.ServerException
-import com.github.senocak.quartz.OperatingSystemJob
 import com.github.senocak.quartz.QuartzHandler
 import com.github.senocak.quartz.TarihteBugunJob
 import com.github.senocak.security.Authorize
@@ -20,6 +18,7 @@ import com.github.senocak.service.UserService
 import com.github.senocak.service.WebSocketCacheService
 import com.github.senocak.util.AppConstants.ADMIN
 import com.github.senocak.util.AppConstants.USER
+import com.github.senocak.util.AppConstants.logger
 import com.github.senocak.util.AppConstants.securitySchemeName
 import com.github.senocak.util.OmaErrorMessageType
 import com.github.senocak.util.PageRequestBuilder
@@ -35,7 +34,6 @@ import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.constraints.Pattern
 import java.util.UUID
 import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.validation.BindingResult
@@ -62,7 +60,7 @@ class UserController(
     private val quartzHandler: QuartzHandler,
     private val schedulerService: SchedulerService
 ): BaseController() {
-    private val log: Logger = LoggerFactory.getLogger(this.javaClass)
+    private val log: Logger by logger()
 
     @Throws(ServerException::class)
     @Operation(
@@ -229,11 +227,11 @@ class UserController(
     ): SchedulerResponse =
         schedulerService.findById(schedulerId = UUID.fromString(id))
             .run {
-                val jobResponse: JobResponse? = quartzHandler.findAllActivatedJob()
-                    .find { it: JobResponse ->
-                        it.jobName == this.name && it.groupName == this.groupName
+                val response: SchedulerResponse? = quartzHandler.findAllActivatedJob()
+                    .find { it: SchedulerResponse ->
+                        it.name == this.name && it.group == this.groupName
                     }
-                this.convertEntityToDto(scheduleTime = jobResponse?.scheduleTime)
+                this.convertEntityToDto(scheduleTime = response?.scheduleTime)
             }
 
     @GetMapping("/jobs/actives")
@@ -243,13 +241,13 @@ class UserController(
         tags = ["User"],
         responses = [
             ApiResponse(responseCode = "200", description = "successful operation",
-                content = arrayOf(Content(mediaType = "application/json", schema = Schema(implementation = JobResponse::class)))),
+                content = arrayOf(Content(mediaType = "application/json", schema = Schema(implementation = SchedulerResponse::class)))),
             ApiResponse(responseCode = "500", description = "internal server error occurred",
                 content = arrayOf(Content(mediaType = "application/json", schema = Schema(implementation = ExceptionDto::class))))
         ],
         security = [SecurityRequirement(name = securitySchemeName, scopes = [ADMIN])]
     )
-    fun findAllActivatedJob(): List<JobResponse> = quartzHandler.findAllActivatedJob()
+    fun findAllActivatedJob(): List<SchedulerResponse> = quartzHandler.findAllActivatedJob()
 
     @GetMapping("/jobs/current")
     @Authorize(roles = [ADMIN])
@@ -258,13 +256,13 @@ class UserController(
         tags = ["User"],
         responses = [
             ApiResponse(responseCode = "200", description = "successful operation",
-                content = arrayOf(Content(mediaType = "application/json", schema = Schema(implementation = JobResponse::class)))),
+                content = arrayOf(Content(mediaType = "application/json", schema = Schema(implementation = SchedulerResponse::class)))),
             ApiResponse(responseCode = "500", description = "internal server error occurred",
                 content = arrayOf(Content(mediaType = "application/json", schema = Schema(implementation = ExceptionDto::class))))
         ],
         security = [SecurityRequirement(name = securitySchemeName, scopes = [ADMIN])]
     )
-    fun getCurrentlyExecutingJobs(): List<JobResponse> = quartzHandler.findCurrentlyExecutingJobs()
+    fun getCurrentlyExecutingJobs(): List<SchedulerResponse> = quartzHandler.findCurrentlyExecutingJobs()
 
 /*
 @PostMapping("/jobs/{group}/{name}/{seconds}")

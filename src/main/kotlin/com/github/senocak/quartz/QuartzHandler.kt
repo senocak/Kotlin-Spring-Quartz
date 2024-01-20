@@ -1,14 +1,16 @@
 package com.github.senocak.quartz
 
-import com.github.senocak.domain.dto.JobResponse
 import com.github.senocak.domain.dto.SampleJobRequest
 import com.github.senocak.domain.dto.SchedulerRequest
+import com.github.senocak.domain.dto.SchedulerResponse
 import com.github.senocak.util.AppConstants.logger
 import java.text.ParseException
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.util.Date
+import java.util.UUID
+import org.quartz.CronTrigger
 import org.quartz.Job
 import org.quartz.JobBuilder
 import org.quartz.JobDataMap
@@ -57,18 +59,21 @@ class QuartzHandler(
     }
 
     @Throws(SchedulerException::class)
-    fun findAllActivatedJob(): List<JobResponse> {
-        val result: MutableList<JobResponse> = arrayListOf()
+    fun findAllActivatedJob(): List<SchedulerResponse> {
+        val result: MutableList<SchedulerResponse> = arrayListOf()
         try {
             for (groupName: String in scheduler.jobGroupNames) {
                 for (jobKey: JobKey in scheduler.getJobKeys(GroupMatcher.jobGroupEquals(groupName))) {
                     val trigger: List<Trigger> = scheduler.getTriggersOfJob(jobKey) as List<Trigger>
-                    result.add(element = JobResponse(
-                        schedulerId = scheduler.getJobDetail(jobKey).jobDataMap["schedulerId"].toString(),
-                        jobName = jobKey.name,
-                        groupName = jobKey.group,
+                    result.add(element = SchedulerResponse(
+                        id = UUID.fromString(scheduler.getJobDetail(jobKey).jobDataMap["schedulerId"].toString()),
+                        name = jobKey.name,
+                        group = jobKey.group,
                         scheduleTime = trigger[0].startTime.toString(),
-                        nextFireTime = trigger[0].nextFireTime.toString()
+                        nextFireTime = trigger[0].nextFireTime.toString(),
+                        cron = (trigger[0] as CronTrigger).cronExpression,
+                        className = scheduler.getJobDetail(jobKey).jobClass.name,
+                        userResponse = null
                     ))
                 }
             }
@@ -79,17 +84,20 @@ class QuartzHandler(
     }
 
     @Throws(SchedulerException::class)
-    fun findCurrentlyExecutingJobs(): List<JobResponse> {
-        val result: MutableList<JobResponse> = arrayListOf()
+    fun findCurrentlyExecutingJobs(): List<SchedulerResponse> {
+        val result: MutableList<SchedulerResponse> = arrayListOf()
         try {
             for (jobExecutionContext: JobExecutionContext in scheduler.currentlyExecutingJobs) {
                 val key: JobKey = jobExecutionContext.jobDetail.key
-                result.add(element = JobResponse(
-                    schedulerId = jobExecutionContext.mergedJobDataMap["schedulerId"].toString(),
-                    jobName = key.name,
-                    groupName = key.group,
+                result.add(element = SchedulerResponse(
+                    id = UUID.fromString(jobExecutionContext.mergedJobDataMap["schedulerId"].toString()),
+                    name = key.name,
+                    group = key.group,
                     scheduleTime = jobExecutionContext.trigger.startTime.toString(),
-                    nextFireTime = jobExecutionContext.trigger.startTime.toString()
+                    nextFireTime = jobExecutionContext.trigger.startTime.toString(),
+                    cron = (jobExecutionContext.trigger as CronTrigger).cronExpression,
+                    className = jobExecutionContext.jobDetail.jobClass.name,
+                    userResponse = null
                 ))
             }
         } catch (e: SchedulerException) {
@@ -120,6 +128,45 @@ class QuartzHandler(
             .usingJobData(jobDataMap)
             .build()
     }
+
+    fun deleteJob(group: String, name: String): Boolean =
+        try {
+            scheduler.deleteJob(JobKey.jobKey(name, group))
+            log.info("Deleted job: $group-$name")
+            true
+        } catch (e: SchedulerException) {
+            log.error("Could not delete job: $group-$name due to error: ${e.localizedMessage}")
+            false
+        }
+
+    fun pauseJob(group: String, name: String): Boolean =
+        try {
+            scheduler.pauseJob(JobKey.jobKey(name, group))
+            log.info("Paused job: $group-$name")
+            true
+        } catch (e: SchedulerException) {
+            log.error("Could not pause job: $group-$name due to error: ${e.localizedMessage}")
+            false
+        }
+
+    fun resumeJob(group: String, name: String): Boolean =
+        try {
+            scheduler.resumeJob(JobKey.jobKey(name, group))
+            log.info("Resumed job: $group-$name")
+            true
+        } catch (e: SchedulerException) {
+            log.error("Could not resume job: $group-$name due to error: ${e.localizedMessage}")
+            false
+        }
+
+    //fun stop(schedule: Schedule) {
+    //    try {
+    //        scheduler.unscheduleJob(TriggerKey.triggerKey(schedule.getId().toString(), GROUP_ID))
+    //    } catch (e: SchedulerException) {
+    //        log.warn("Unable to unschedule job with id {}", schedule.getId())
+    //    }
+    //}
+
 
     private fun buildCronTrigger(cronExp: String): Trigger? {
         /*

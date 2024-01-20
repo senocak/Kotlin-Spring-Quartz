@@ -51,12 +51,13 @@ data class SchedulerResponse(
 
     @JsonProperty("user")
     @Schema(required = true)
-    var userResponse: UserResponse,
+    var userResponse: UserResponse?,
 
     @ArraySchema(schema = Schema(description = "results", required = false, type = "String"))
     var results: List<String> = arrayListOf(),
 
-    val scheduleTime: String? = null
+    val scheduleTime: String,
+    val nextFireTime: String
 )
 
 data class SampleJobRequest(
@@ -68,11 +69,3 @@ data class SampleJobRequest(
     var content: String? = null
     var description: String? = null
 }
-
-data class JobResponse(
-    var schedulerId: String,
-    var jobName: String,
-    var groupName: String,
-    var scheduleTime: String,
-    var nextFireTime: String,
-)
